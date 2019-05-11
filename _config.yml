@@ -1,0 +1,45 @@
+# Hexo Configuration
+## Docs: https://hexo.io/docs/configuration.html
+## Source: https://github.com/hexojs/hexo/
+
+# Site
+title: 工欲善其事，必先利其器
+subtitle:
+description: 
+keywords:
+author: beyond667
+language:
+timezone:
+
+sidebar:
+   bio: Android
+   avatar: /images/avatar.jpg
+   subtitle: 码奴
+   location: Shenzhen
+   social:
+     github: https://github.com/beyond667
+     weibo: 
+     twitter: 
+
+Home:
+   name: homePage
+   value: /index.html
+   icon: home
+# URL
+## If your site is put in a subdirectory, set url as 'http://yoursite.com/child' and root as '/child/'
+url: https://beyond667.github.io/
+root: /
+permalink: :year/:month/:day/:title/
+permalink_defaults: images/
+
+
+
+## Themes: https://hexo.io/themes/
+theme: aloha
+
+# Theme version
+version: 0.1.0
+deploy:
+  type: git
+  repository: git@github.com:beyond667/beyond667.github.io.git
+  branch: master
