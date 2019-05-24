@@ -336,15 +336,135 @@ public abstract class IntentService extends Service {
 }
 ```
 通过源码看到：
-1. IntentService继承Service，专门处理异步请求。所以用法跟Service基本一样，通过startService来启动。
-2. IntentService的onBind方法返回null，所以如果你通过onBind启动的话相当于绕过IntentService的onStartCommand方法，也就绕过了handler的sendMessage方法，在你自定义的service的onHandleIntent方法就不会被调用，相当于你没用IntentService而是用的Service。
+1. IntentService继承Service，专门处理异步请求。所以用法跟Service基本一样，但只能通过startService来启动。
+2. IntentService的onBind方法返回null，所以如果你通过onBind启动的话相当于绕过IntentService的onStartCommand方法，也就绕过了handler的sendMessage方法，在你自定义的service的onHandleIntent方法就不会被调用，相当于你没用IntentService而是用的普通Service。
 3. IntentService本质上是通过HandlerThread，Message，Looper实现的在service中的异步线程消息处理机制。
 4. onStart方法在Service的生命周期中不会执行，但是在IntentService中会在onStartCommand后执行，另外在子类的onStartCommand方法中不能直接return START_STICKY等，而是super.onStartCommand。
 5. 在所有的looper任务处理结束后会将自身服务关闭，不需要用户手动的停止服务。
 具体使用请参照链接：[IntentService使用例子](https://github.com/beyond667/study/blob/master/app/src/main/java/demo/beyond/com/blog/service/MyIntentService.java "IntentService使用例子")
 
-#### Service与进程间通信
+#### Service与进程间通信（IPC）- AIDL
+AIDL(Android Interface Definition Language，即Android接口定义语言),用于定义服务器和客户端通信接口的一种描述语言，可以拿来生成用于 IPC 的代码, AIDL这门语言的目的就是为了实现进程间通信，可以在一个进程中获取另一个进程的数据和调用其暴露出来的方法，从而实现进程间通信。
+##### AIDL语法
+- 服务端定义AIDL文件。在src目录下新建.aidl文件。写完后build后会生成java文件。  
+IMyAidlInterface.aidl
+```
+//即使IMyListener在同一目录下，也需要手动import进来，android studio不会自动引入
+import demo.beyond.com.blog.IMyListener;
+interface IMyAidlInterface {
+    void operation(int parameter1 , int parameter2, IMyListener listener);
+}
+```
+IMyListener.aidl
+```
+interface IMyListener {
+   void onSuccess(in int result);
+}
+
+```
+AIDL支持的数据类型分为如下几种： 
+1 八种基本数据类型：byte、char、short、int、long、float、double、boolean，String，CharSequence  
+2 实现了Parcelable接口的数据类型  
+3 List 类型。List承载的数据必须是AIDL支持的类型，或者是其它声明的AIDL对象  
+4 Map类型。Map承载的数据必须是AIDL支持的类型，或者是其它声明的AIDL对象  
+- 写服务端服务。AIDLService.java
+```
+public class AIDLService extends Service{
+    private static final String TAG = "AIDLService";
+    public AIDLService() {
+    }
+    
+    //这里定义的aidl.Stub就是IBinder接口。这里模拟服务端处理耗时请求，之后通过回调onSuccess告诉客户端结果
+    private IMyAidlInterface.Stub stub = new IMyAidlInterface.Stub() {
+        @Override
+        public void operation(int param1, int param2, IMyListener listener) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                listener.onSuccess(param1*param2);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
+
+        }
+
+
+    };
+    
+    @Override
+    public IBinder onBind(Intent intent) {
+        Toast.makeText(this,"服务绑定成功",Toast.LENGTH_LONG).show();
+        return stub;
+    }
+}
+```
+这样服务端就写好了。
+-  客户端复制服务端的aidl文件，build后只需要调用服务端方法就可以
+```
+    private IMyAidlInterface iMyAidlInterface;
+    private IMyListener mCallback = new IMyListener.Stub() {
+        @Override
+        public void onSuccess(int result) throws RemoteException {
+            resultTv.setText("" + result);
+        }
+    };
+
+    private void initView() {
+        findViewById(R.id.botton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                String params1 = params1Tv.getText().toString();
+                String params2 = params2Tv.getText().toString();
+                try {
+                    if (iMyAidlInterface == null) {
+                        Toast.makeText(MainActivity.this, "没注册", Toast.LENGTH_LONG).show();
+                    } else {
+                        iMyAidlInterface.operation(Integer.parseInt(params1), Integer.parseInt(params2), mCallback);
+                    }
+
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        findViewById(R.id.bind).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                bindService();
+            }
+        });
+    }
+
+    //只能通过包名和aidl服务全名来绑定
+    private void bindService() {
+        Intent intent = new Intent();
+        intent.setClassName("demo.beyond.com.blog", "demo.beyond.com.blog.service.AIDLService");
+        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    private ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, final IBinder service) {
+            iMyAidlInterface = IMyAidlInterface.Stub.asInterface(service);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            iMyAidlInterface = null;
+        }
+    };
+```
+这里客户端只能通过bind方式绑定远程服务，onServiceConnected回调后端IBinder就是远程端AIDLService，客户端就可以调用服务端AIDLService实现端方法，服务端可以通过传进来的回调对象，调用回调方法onSuccess来通知客户端处理结果。  
+Demo链接：  
+[服务端 IMyAidlInterface.aidl](https://github.com/beyond667/study/blob/master/app/src/main/aidl/demo/beyond/com/blog/IMyAidlInterface.aidl)  
+[AIDLService.java](https://github.com/beyond667/study/blob/master/app/src/main/java/demo/beyond/com/blog/service/AIDLService.java)  
+[客户端 ClientActivity.java](https://github.com/beyond667/study/blob/master/app/src/main/java/demo/beyond/com/blog/service/ClientActivity.java) 
 
 ### 使用场景
+一般普通的异步任务，比如网络请求，数据库或者文件相关操作，我们都会使用线程池的方式来做，因为这样使用的系统开销小，运行效率高，而且随着业务逻辑的复杂度增加，扩展性也更强。然而，对于一些特殊场景，比如进程保活，使用第三方SDK服务比如地图，IM等，就需要使用Service来实现，因为这些服务一般与App主进程隔离开，需要运行在新进程中以防止App主进程发生异常崩溃时，牵连第三方服务也挂掉。进程保活后面会专门研究。
 
-#### 进程保活
