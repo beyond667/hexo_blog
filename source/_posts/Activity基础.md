@@ -173,8 +173,16 @@ public void onClick(View v) {
 以A，B（透明），C（不透明）Activity为例：
 A可见时:onCreate,onStart,onResume  
 跳转到B:onPause
-跳转到C:onPause,onStop
+跳转到C:onPause,onStop(C可见后调)
 从C返回:onRestart,onStart,onResume
-按Home到桌面:onPause,onStop
+按Home到桌面或者电源或者口键:onPause,onStop
 从桌面又到A:onRestart,onStart,onResume
 A后退:onPause,onStop,onDestory
+横竖屏切换不配置configChanges:onPause,onStop,onDestory,onCreate,onStart,onRestoreInstanceState,onResume（有人说切横屏会执行一次，切竖屏会执行两次，亲测用华为mate20都只执行一次)  
+设置configChanges="orientation"或者"orientation|hidden"：onConfigurationChanged。有人说orientation会重新执行一次生命周期，亲测只执行onConfigurationChanged
+
+### 启动模式
+- standard模式：默认启动模式。Activity可以有多个实例，每次启动Activity，无论任务栈中是否已经有这个Activity的实例，系统都会创建一个新的Activity实例
+- singleTop模式：SingleTop模式和standard模式非常相似，主要区别就是当一个singleTop模式的Activity已经位于任务栈的栈顶，再去启动它时，不会再创建新的实例,如果不位于栈顶，就会创建新的实例。
+- singleTask模式：SingleTask模式的Activity在同一个Task内只有一个实例，如果Activity已经位于栈顶，系统不会创建新的Activity实例，和singleTop模式一样。但Activity已经存在但不位于栈顶时，系统就会把该Activity移到栈顶，并把它上面的activity出栈。
+- singleInstance模式：singleInstance模式也是单例的，但和singleTask不同，singleTask只是任务栈内单例，系统里是可以有多个singleTask Activity实例的，而singleInstance Activity在整个系统里只有一个实例，启动一singleInstanceActivity时，系统会创建一个新的任务栈，并且这个任务栈只有他一个Activity。
