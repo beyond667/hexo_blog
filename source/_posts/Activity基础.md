@@ -228,11 +228,16 @@ allowTaskReparenting的作用是Activity的迁移，当allowTaskReparenting属�
 应用A打开应用B的ActivityC页面：ActivityC位于ActivityA的栈顶，即栈a。  
 按home，点应用B：ActivityC会从应用A的栈顶移动到应用B的栈顶，这时候栈b有ActivityC和应用B的MainActivity，栈a没有ActivityC。
 在ActivityC页面点后退，会回到应用B的MainActivity，并从onCreate开始执行。
-如果B应用的ActivityC页面不设置allowTaskReparenting（默认false），从A跳转到ActivityC相当于属于应用A，再打开应用B时ActivityC不会从A应用移动到B，而是相当于打开应用B。
+如果B应用的ActivityC页面不设置allowTaskReparenting（默认false），从A跳转到ActivityC相当于属于应用A，再打开应用B时ActivityC不会从A应用移动到B，而是相当于打开应用B。  
+注意：测试中发现应用A隐式启动到应用B的ActivityC页面，如果ActivityC什么都不设置，此时位于栈a;如果设置成singleTask，会新启动一个栈，这个栈属于应用A。
 
-#### 其他
-测试中发现应用A隐式启动到应用B的ActivityC页面，如果ActivityC什么都不设置，此时位于栈a;如果设置成singleTask，会新启动一个栈，这个栈属于应用A。
-
+### startActivityForResult onActivityResult setResult
+使用场景：一个主界面跳转到多个不同到子界面，子界面处理完后把数据返回给主界面，这种带数据的返回就可以用这种方式。
+- 主界面startActivityForResult（intent，requestCode）：定义跳转的界面和请求码。
+- 子界面通过setResult（resultCode，intent（可空））：定义返回码和返回数据。
+- 主界面重写onActivityResult（requestCode，resultCode，intent）：分别是请求码，返回码，返回数据。
+其中，setResult方法必须在finish之前调用，activity源码中finish方法会返回result，所以如果是在finish之后setReslut数据是不会设置进去的，这时虽然onActivityResult会回调但是拿不到真实的数据。另外测试发现，setResult在子界面的onPause和onStop中也是无效的。　  
+可以在按钮的点击事件中setResult后finish，或者在用户点返回键的时候，重写onBackPressed，在这里setResult。
 
 
 
